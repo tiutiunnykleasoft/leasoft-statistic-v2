@@ -12,6 +12,7 @@ class HttpSlackClient implements SlackClient
      * @var \GuzzleHttp\Client
      */
     private Client $guzzleClient;
+    private string $token;
 
     public function __construct(
         private readonly string $clientId,
@@ -24,6 +25,12 @@ class HttpSlackClient implements SlackClient
             'keepalive' => false,
             'timeout' => 5,
         ]);
+    }
+
+    public function setToken(string $token)
+    {
+        $this->token = $token;
+        return $this;
     }
 
     /**
@@ -44,7 +51,7 @@ class HttpSlackClient implements SlackClient
         );
     }
 
-    public function conversationsHistory(string $token, string $channel, string $oldest, $latest = null): array
+    public function conversationsHistory(string $channel, string $oldest, $latest = null): array
     {
         return $this->send(
             method: HttpMethod::GET,
@@ -54,11 +61,11 @@ class HttpSlackClient implements SlackClient
                 'oldest' => $oldest,
                 'latest' => $latest
             ],
-            authToken: $token
+            authToken: $this->token
         )['messages'];
     }
 
-    public function conversationsReplies(string $token, string $channel, string $ts): array
+    public function conversationsReplies(string $channel, string $ts): array
     {
         return $this->send(
             method: HttpMethod::GET,
@@ -67,11 +74,11 @@ class HttpSlackClient implements SlackClient
                 'channel' => $channel,
                 'ts' => $ts
             ],
-            authToken: $token
+            authToken: $this->token
         )['messages'];
     }
 
-    public function chatPostMessage(string $token, string $channel, string $text = null, array $blocks = []): array
+    public function chatPostMessage(string $channel, string $text = null, array $blocks = []): array
     {
         return $this->send(
             method: HttpMethod::POST,
@@ -81,7 +88,7 @@ class HttpSlackClient implements SlackClient
                 'text' => $text,
                 'blocks' => json_encode($blocks)
             ]),
-            authToken: $token
+            authToken: $this->token
         );
     }
 
