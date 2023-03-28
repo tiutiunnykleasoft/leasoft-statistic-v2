@@ -150,7 +150,7 @@ class checkinBuilder
         return $reminderMessages;
     }
 
-    private function isThisDailyReminder($message): bool
+    public static function isThisDailyReminder($message): bool
     {
         $reminderText = "Reminder: Please post your daily check-in: :+1:What went well yesterday? :no_entry_sign:What was in your way
 yesterday? :rocket:What are your goals for today?";
