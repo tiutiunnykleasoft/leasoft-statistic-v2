@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\API\CheckinRPC;
+use App\Http\Controllers\API\MessageRPC;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -20,3 +21,4 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 });
 
 Route::post('/checkin', [CheckinRPC::class, 'handleRpc']);
+Route::post('/message', [MessageRPC::class, 'handleRpc']);

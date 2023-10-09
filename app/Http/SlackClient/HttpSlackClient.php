@@ -78,6 +78,18 @@ class HttpSlackClient implements SlackClient
         )['messages'];
     }
 
+    public function userDetails(string $userId): array
+    {
+        return $this->send(
+            method: HttpMethod::GET,
+            path: 'users.info',
+            data: [
+                'user' => $userId,
+            ],
+            authToken: $this->token
+        );
+    }
+
     public function chatPostMessage(string $channel, string $text = null, array $blocks = []): array
     {
         return $this->send(

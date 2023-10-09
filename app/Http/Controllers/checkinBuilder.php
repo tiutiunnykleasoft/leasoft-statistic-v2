@@ -4,7 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Http\SlackClient\BlocksConstructorKit;
 use App\Http\SlackClient\SlackClient;
+use App\Http\SlackClient\SlackException;
 use App\Models\UserSlack;
+use DateInterval;
+use DateTime;
+use PHPUnit\Util\Exception;
 
 class checkinBuilder
 {
@@ -45,17 +49,32 @@ class checkinBuilder
         $this->slackClient->setToken($botToken);
     }
 
-    public function constructBlock($oldest, $latest): array
+    private function getWeekCheckinTitle($monthName)
+    {
+        return sprintf("%s, weekly checkin statistic", $monthName);
+    }
+
+    private function getMonthlyCheckinTitle($emoji, $monthName)
+    {
+        return sprintf(":%s: %s checkin statistic", $emoji, $monthName);
+    }
+
+    public function constructBlock(string $oldest, string $latest, string $type): array
     {
         $monthName = date('F', $oldest);
         $monthEmoji = self::MONTH_EMOJI[date('n', $oldest)];
         $blocks = [
-            BlocksConstructorKit::header(":$monthEmoji: $monthName checkin statistic"),
+            BlocksConstructorKit::header($type === 'weekly' ? $this->getWeekCheckinTitle(
+                monthName: $monthName
+            ) : $this->getMonthlyCheckinTitle(
+                emoji: $monthEmoji,
+                monthName: $monthName
+            )),
         ];
         $position = 0;
         $checkinArray = $this->getStatisticHash($oldest, $latest);
         foreach ($checkinArray as $user => $values) {
-            if ($values['count'] <= 5) continue;
+//            if ($values['count'] <= 5) continue;
 
             $position += 1;
             if ($position == count($checkinArray)) {
@@ -91,13 +110,34 @@ class checkinBuilder
             $replyHash = [];
             foreach ($replies as $kek => $reply) {
                 if (isset($reply['bot_id'])) continue;
-                $checkinInterval = $reply['ts'] - $messageTs;
 
-                if ($checkinInterval > 60 * 60 * 24 * 2) continue;
+                $userInfo = $this->slackClient->userDetails($reply['user']);
+
+                $checkinDateTime = new DateTime("@".($reply['ts']));
+                $messageDateTime = new DateTime("@".($messageTs));
+
+                $tz_offset = $userInfo['user']['tz_offset'];
+
+                $offsetInterval = new DateInterval("PT".abs($tz_offset)."S");
+
+                if ($tz_offset > 0) {
+                    $checkinDateTime->add($offsetInterval);
+                    $messageDateTime->add($offsetInterval);
+                } else {
+                    $checkinDateTime->sub($offsetInterval);
+                    $messageDateTime->sub($offsetInterval);
+                }
+
+                $local_checkin_time = strtotime($checkinDateTime->format('Y-m-d H:i:s'));
+                $local_message_time = strtotime($messageDateTime->format('Y-m-d H:i:s'));
+
+                $checkinInterval = $local_checkin_time - $local_message_time;
+//                if ($checkinInterval > 60 * 60 * 24 * 2) continue;
                 if (isset($replyHash[$reply['user']])) continue;
 
                 $replyHash[$reply['user']][] = $checkinInterval;
             }
+
             foreach ($replyHash as $user => $results) {
                 $statisticHash[$user] = array_merge($statisticHash[$user] ?? [], $results);
             }

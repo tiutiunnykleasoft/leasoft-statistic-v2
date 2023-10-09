@@ -20,13 +20,15 @@ class eventCallback extends AbstractEvent
     {
         switch (true) {
             case preg_match('/^Reminder: Post monthly checkin.$/', $eventPayload['text']):
-                return $this->getCheckin($eventPayload);
+                return $this->getMonthlyCheckin($eventPayload);
+            case preg_match('/^Reminder: Post weekly checkin.$/', $eventPayload['text']):
+                return $this->getWeeklyCheckin($eventPayload);
             default:
                 break;
         }
     }
 
-    public function getCheckin($payload)
+    public function getWeeklyCheckin($payload)
     {
         $request = Request::createFromGlobals();
 
@@ -34,7 +36,24 @@ class eventCallback extends AbstractEvent
             url: $request->getSchemeAndHttpHost() . '/api/checkin',
             requestData: [
                 'channelId' => "C01D3LT34LB",
-                'teamId' => $payload['team']
+                'teamId' => $payload['team'],
+                'type' => 'weekly'
+            ]
+        );
+
+        http_response_code(200);
+    }
+
+    public function getMonthlyCheckin($payload)
+    {
+        $request = Request::createFromGlobals();
+
+        ProcessRpcCall::dispatch(
+            url: $request->getSchemeAndHttpHost() . '/api/checkin',
+            requestData: [
+                'channelId' => "C01D3LT34LB",
+                'teamId' => $payload['team'],
+                'type' => 'monthly'
             ]
         );
 
