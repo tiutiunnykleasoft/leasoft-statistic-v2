@@ -59,9 +59,9 @@ class CheckinRPC extends Controller
 
             $response = $client->chatPostMessage(
             //@TODO: Rework before release
-//            channel: $channelId,
+            channel: $channelId,
 //Test channel
-                channel: "G01GAKP04BV",
+//channel: "G01GAKP04BV",
                 threadTs: $threadTs > 0 ? $threadTs : null,
                 text: 'Checkin',
                 blocks: $blocks
