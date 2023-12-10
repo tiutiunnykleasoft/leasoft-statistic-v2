@@ -19,7 +19,7 @@ interface SlackClient
 
     public function userDetails(string $userId): array;
 
-    public function chatPostMessage(string $channel, string $text = null, array $blocks = []): array;
+    public function chatPostMessage(string $channel, string $threadTs = null, string $text = null, array $blocks = []): array;
 
     public function send(HttpMethod $method, string $path, array $data = null, string $authToken = null, array $options = []): string|array|bool|int|null|object|float;
 }

@@ -38,12 +38,6 @@ class CheckinRPC extends Controller
                 break;
         }
 
-        $response = $checkinBuilder->constructBlock(
-            oldest: $oldest,
-            latest: $latest,
-            type: $type
-        );
-
         /**
          * @var $client SlackClient
          */
@@ -51,14 +45,31 @@ class CheckinRPC extends Controller
         $botLine = UserSlack::where('team_id', $teamId)->first();
         $botToken = $botLine->toArray()['bot_token'];
         $client->setToken($botToken);
+        $checkinArray = $checkinBuilder->getStatisticHash($oldest, $latest);
 
-        $client->chatPostMessage(
+        $threadTs = 0;
+        for ($step = 1; $step <= 2; $step++) {
+            $blocks = $checkinBuilder->constructBlock(
+                oldest: $oldest,
+                latest: $latest,
+                type: $type,
+                checkinArray: $checkinArray,
+                step: $step
+            );
+
+            $response = $client->chatPostMessage(
             //@TODO: Rework before release
-            channel: $channelId,
+//            channel: $channelId,
 //Test channel
-//            channel: "G01GAKP04BV",
-            text: 'Checkin',
-            blocks: $response
-        );
+                channel: "G01GAKP04BV",
+                threadTs: $threadTs > 0 ? $threadTs : null,
+                text: 'Checkin',
+                blocks: $blocks
+            );
+
+            if ($response['ok']) {
+                $threadTs = $response['ts'];
+            }
+        }
     }
 }

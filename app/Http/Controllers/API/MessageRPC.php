@@ -17,6 +17,7 @@ class MessageRPC extends Controller
         $channelId = $request->get('channelId');
         $message = $request->get('message');
         $teamId = $request->get('teamId');
+        $threadTs = $request->get('threadTs');
 
         $blocks = [BlocksConstructorKit::header('Feature announcement')];
 
@@ -36,6 +37,7 @@ class MessageRPC extends Controller
             channel: $channelId,
 // Test channel
 //            channel: "G01GAKP04BV",
+            threadTs: $threadTs ?: null,
             text: 'Checkin',
             blocks: $blocks
         );

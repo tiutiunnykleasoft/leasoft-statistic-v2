@@ -8,17 +8,19 @@ use App\Http\SlackClient\SlackException;
 use App\Models\UserSlack;
 use DateInterval;
 use DateTime;
+use DateTimeZone;
 use PHPUnit\Util\Exception;
 
 class checkinBuilder
 {
     const POSITION_EMOJI = [
-        1 => "🏆🥇",
+        1 => "🏆",
         2 => "🥈",
         3 => "🥉",
         4 => "🦾",
         "avg" => "👍",
-        "last" => "😴"
+        "last" => "😴",
+        'time' => "🕒"
     ];
 
     const MONTH_EMOJI = [
@@ -49,9 +51,9 @@ class checkinBuilder
         $this->slackClient->setToken($botToken);
     }
 
-    private function getWeekCheckinTitle($monthName)
+    private function getWeekCheckinTitle($oldest, $latest)
     {
-        return sprintf("%s, weekly checkin statistic", $monthName);
+        return sprintf("%s - %s", date('d M', $oldest), date('d M', $latest));
     }
 
     private function getMonthlyCheckinTitle($emoji, $monthName)
@@ -59,25 +61,41 @@ class checkinBuilder
         return sprintf(":%s: %s checkin statistic", $emoji, $monthName);
     }
 
-    public function constructBlock(string $oldest, string $latest, string $type): array
+    public function constructBlock(string $oldest, string $latest, string $type, array $checkinArray, $step = 1): array
     {
         $monthName = date('F', $oldest);
         $monthEmoji = self::MONTH_EMOJI[date('n', $oldest)];
         $blocks = [
             BlocksConstructorKit::header($type === 'weekly' ? $this->getWeekCheckinTitle(
-                monthName: $monthName
+                oldest: $oldest,
+                latest: $latest,
             ) : $this->getMonthlyCheckinTitle(
                 emoji: $monthEmoji,
                 monthName: $monthName
             )),
         ];
         $position = 0;
-        $checkinArray = $this->getStatisticHash($oldest, $latest);
+
+        switch ($step) {
+            case 1:
+                $checkinArray = array_splice($checkinArray, 0, 3);
+                break;
+            case 2:
+                $position = 3;
+                $blocks = [];
+                $checkinArray = array_splice($checkinArray, 3);
+                break;
+            default:
+                break;
+
+        }
         foreach ($checkinArray as $user => $values) {
 //            if ($values['count'] <= 5) continue;
 
             $position += 1;
-            if ($position == count($checkinArray)) {
+            if (count($checkinArray) <= 3) {
+                $emoji = self::POSITION_EMOJI[$position];
+            } else if ($position == count($checkinArray)) {
                 $emoji = self::POSITION_EMOJI['last'];
             } elseif ($position > 4) {
                 $emoji = self::POSITION_EMOJI['avg'];
@@ -87,13 +105,18 @@ class checkinBuilder
 
             $blocks[] =
                 BlocksConstructorKit::section(
-                    BlocksConstructorKit::markdown("$emoji <@$user> has an average checkin time of ${values['averageString']}, with only ${values['count']} checkins")
+                    BlocksConstructorKit::markdown(sprintf("%s %-20s - %s %-11s (%-8s)",
+                        $emoji,
+                        "<@$user>",
+                        self::POSITION_EMOJI['time'],
+                        $values['averageString'],
+                        $values['count'] > 1 ? "${values['count']} checkins" : "${values['count']} checkin"))
                 );
         }
         return $blocks;
     }
 
-    private function getStatisticHash($oldest, $latest): array
+    public function getStatisticHash($oldest, $latest): array
     {
         $checkInReminderMessages = $this->getAllCheckinReminderMessages(
             oldest: $oldest,
@@ -112,26 +135,21 @@ class checkinBuilder
                 if (isset($reply['bot_id'])) continue;
 
                 $userInfo = $this->slackClient->userDetails($reply['user']);
+                $tz_offset = $userInfo['user']['tz_offset']; // Часовой пояс пользователя в секундах
 
-                $checkinDateTime = new DateTime("@".($reply['ts']));
-                $messageDateTime = new DateTime("@".($messageTs));
+                // Создание объекта DateTime для времени сообщения
+                $messageDateTime = new DateTime("@" . $reply['ts']);
+                $messageDateTime->setTimezone(new DateTimeZone(timezone_name_from_abbr("", $tz_offset, 0)));
 
-                $tz_offset = $userInfo['user']['tz_offset'];
+                // Создание объекта DateTime для 9 утра в часовом поясе пользователя
+                $startOfWorkDay = clone $messageDateTime;
+                $startOfWorkDay->setTime(9, 0, 0); // Установка времени на 9 утра
 
-                $offsetInterval = new DateInterval("PT".abs($tz_offset)."S");
+                // Конвертация обоих времен в Unix timestamp
+                $local_message_time = $messageDateTime->getTimestamp();
+                $start_of_work_day_time = $startOfWorkDay->getTimestamp();
 
-                if ($tz_offset > 0) {
-                    $checkinDateTime->add($offsetInterval);
-                    $messageDateTime->add($offsetInterval);
-                } else {
-                    $checkinDateTime->sub($offsetInterval);
-                    $messageDateTime->sub($offsetInterval);
-                }
-
-                $local_checkin_time = strtotime($checkinDateTime->format('Y-m-d H:i:s'));
-                $local_message_time = strtotime($messageDateTime->format('Y-m-d H:i:s'));
-
-                $checkinInterval = $local_checkin_time - $local_message_time;
+                $checkinInterval = abs($local_message_time - $start_of_work_day_time);
 //                if ($checkinInterval > 60 * 60 * 24 * 2) continue;
                 if (isset($replyHash[$reply['user']])) continue;
 
